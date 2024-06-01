@@ -19,30 +19,45 @@ protocol Cache {
     func load() -> [Todo]
 }
 
-class JSONFileManagerCache: Cache {
+class FileSystemCache: Cache {
     private var todos: [Todo] = []
+    private let filePath: URL
+
+    init() {
+        if let currentDirectory = FileManager.default.currentDirectoryPath as NSString? {
+            let fileURL = URL(fileURLWithPath: currentDirectory.appendingPathComponent("todos.json"))
+            self.filePath = fileURL
+        } else {
+            fatalError("Unable to locate current directory.")
+        }
+        self.todos = load()
+    }
 
     func save(todos: [Todo]) {
         self.todos = todos
+        do {
+            let encoder = JSONEncoder()
+            let data = try encoder.encode(todos)
+            try data.write(to: filePath)
+            print("📌 Todos saved to file successfully!")
+        } catch {
+            print("Error saving todos to file: \(error)")
+        }
     }
 
     func load() -> [Todo] {
-        return todos
+        do {
+            let data = try Data(contentsOf: filePath)
+            let decoder = JSONDecoder()
+            return try decoder.decode([Todo].self, from: data)
+        } catch {
+            print("Error loading todos from file: \(error)")
+            return []
+        }
     }
 }
 
 
-class InMemoryCache: Cache {
-    private var todos: [Todo] = []
-
-    func save(todos: [Todo]) {
-        self.todos = todos
-    }
-
-    func load() -> [Todo] {
-        return todos
-    }
-}
 
 // MARK: - TodosManager Class
 
@@ -84,6 +99,7 @@ class TodosManager {
     }
 }
 
+
 // MARK: - App Class
 
 class App {
@@ -94,8 +110,8 @@ class App {
     private let todosManager: TodosManager
 
     init() {
-        // Choose your preferred caching strategy here (InMemoryCache or JSONFileManagerCache)
-        let cache: Cache = JSONFileManagerCache()
+  
+        let cache = FileSystemCache()
         self.todosManager = TodosManager(cache: cache)
     }
 
